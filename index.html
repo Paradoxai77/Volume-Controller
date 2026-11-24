@@ -21,7 +21,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
+      padding: 16px;
     }
     header {
       width: 100%;
@@ -29,11 +29,11 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 24px;
+      padding: 14px 24px;
       background: #1c130c;
       border: 1px solid #312316;
       border-radius: 12px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .brand h1 {
       font-size: 1.4rem;
@@ -64,7 +64,7 @@
       width: 100%;
       max-width: 1200px;
       display: grid;
-      grid-template-columns: 1fr 340px;
+      grid-template-columns: 1fr 350px;
       gap: 20px;
     }
     @media (max-width: 900px) {
@@ -82,16 +82,24 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.5);
     }
-    video {
-      display: none;
+    /* Hidden video element MUST remain in layout for browser to decode frames */
+    #webcam {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 640px;
+      height: 480px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: -100;
     }
     canvas {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scaleX(-1);
+      transform: scaleX(-1); /* Mirror canvas visually for intuitive user perspective */
     }
     .hud-overlay {
       position: absolute;
@@ -103,7 +111,7 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 20px;
+      padding: 16px;
     }
     .hud-top {
       display: flex;
@@ -118,6 +126,7 @@
       font-size: 0.85rem;
       font-weight: 600;
       color: #fff;
+      backdrop-filter: blur(4px);
     }
     .hud-bottom {
       display: flex;
@@ -130,7 +139,9 @@
       padding: 8px 16px;
       border-radius: 10px;
       font-size: 0.9rem;
+      font-weight: 600;
       color: #ffd246;
+      backdrop-filter: blur(4px);
     }
     .controls-panel {
       background: #1c130c;
@@ -139,7 +150,7 @@
       padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
     .meter-box {
       background: #140d07;
@@ -155,10 +166,10 @@
       letter-spacing: 1px;
     }
     .meter-value {
-      font-size: 2.8rem;
+      font-size: 3rem;
       font-weight: 900;
       color: #bbe045;
-      margin: 8px 0;
+      margin: 6px 0;
     }
     .meter-bar-container {
       width: 100%;
@@ -174,6 +185,31 @@
       background: linear-gradient(90deg, #bbe045, #46d2ff);
       transition: width 0.08s ease-out;
     }
+    /* Gesture confirmation progress bar matching main.py */
+    .confirmation-box {
+      margin-top: 10px;
+      text-align: left;
+    }
+    .confirmation-label {
+      font-size: 0.7rem;
+      color: #b9a692;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .confirmation-track {
+      width: 100%;
+      height: 8px;
+      background: #2a1c10;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .confirmation-fill {
+      width: 0%;
+      height: 100%;
+      background: #bbe045;
+      transition: width 0.05s linear;
+    }
     .info-group {
       background: #140d07;
       border: 1px solid #312316;
@@ -186,6 +222,7 @@
     .info-row {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       font-size: 0.85rem;
     }
     .info-row span:first-child {
@@ -194,6 +231,28 @@
     .info-row span:last-child {
       font-weight: 600;
       color: #f5f5f5;
+    }
+    .chips-row {
+      display: flex;
+      gap: 4px;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+    .finger-chip {
+      background: #201710;
+      border: 1px solid #382618;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.68rem;
+      text-align: center;
+      flex: 1;
+      color: #b9a692;
+    }
+    .finger-chip.active {
+      border-color: #bbe045;
+      color: #bbe045;
+      background: #222b10;
+      font-weight: bold;
     }
     .btn-group {
       display: flex;
@@ -227,7 +286,7 @@
     .guide-section {
       width: 100%;
       max-width: 1200px;
-      margin-top: 24px;
+      margin-top: 20px;
       background: #1c130c;
       border: 1px solid #312316;
       border-radius: 16px;
@@ -271,6 +330,7 @@
 
   <div class="main-container">
     <div class="stage-card">
+      <!-- Hidden video element decoded by browser -->
       <video id="webcam" playsinline autoplay muted></video>
       <canvas id="output-canvas"></canvas>
       <div class="hud-overlay">
@@ -279,7 +339,7 @@
           <div class="badge" id="mode-badge" style="color: #bbe045;">MODE: ACTIVE</div>
         </div>
         <div class="hud-bottom">
-          <div class="status-pill" id="action-message">Show hand to camera</div>
+          <div class="status-pill" id="action-message">Hold hand in camera view</div>
         </div>
       </div>
     </div>
@@ -291,50 +351,68 @@
         <div class="meter-bar-container">
           <div class="meter-bar-fill" id="volume-fill"></div>
         </div>
+        
+        <div class="confirmation-box">
+          <div class="confirmation-label">
+            <span>Gesture Hold Confirm</span>
+            <span id="confirm-percent">0%</span>
+          </div>
+          <div class="confirmation-track">
+            <div class="confirmation-fill" id="confirm-fill"></div>
+          </div>
+        </div>
       </div>
 
       <div class="info-group">
         <div class="info-row">
-          <span>Detected Gesture:</span>
+          <span>Active Gesture:</span>
           <span id="gesture-text" style="color: #46d2ff;">NONE</span>
         </div>
         <div class="info-row">
-          <span>Pinch Distance:</span>
-          <span id="gap-text">0</span>
+          <span>Pinch Gap:</span>
+          <span id="gap-text">0 px</span>
         </div>
         <div class="info-row">
-          <span>Audio Playback:</span>
-          <span id="audio-state-text" style="color: #ffd246;">Playing Synth</span>
+          <span>Hand Tracking:</span>
+          <span id="hand-status" style="color: #ffd246;">Searching...</span>
+        </div>
+
+        <div style="font-size: 0.72rem; color: #b9a692; margin-top: 6px;">Finger States:</div>
+        <div class="chips-row">
+          <div class="finger-chip" id="chip-index">Index</div>
+          <div class="finger-chip" id="chip-middle">Middle</div>
+          <div class="finger-chip" id="chip-ring">Ring</div>
+          <div class="finger-chip" id="chip-pinky">Pinky</div>
         </div>
       </div>
 
       <div class="btn-group">
-        <button class="btn btn-primary" id="toggle-audio-btn">Mute / Unmute Audio</button>
+        <button class="btn btn-primary" id="toggle-audio-btn">Mute / Unmute Audio (M)</button>
         <button class="btn btn-secondary" id="toggle-control-btn">Pause / Resume Gestures (P/C)</button>
-        <button class="btn btn-secondary" id="synth-sound-btn">Restart Sound Synthesizer</button>
+        <button class="btn btn-secondary" id="synth-sound-btn">Enable Sound Feedback</button>
       </div>
     </div>
   </div>
 
   <div class="guide-section">
     <h2 style="font-size: 1.2rem; color: #f5f5f5; margin-bottom: 4px;">Gesture Control Guide</h2>
-    <p style="font-size: 0.85rem; color: #b9a692;">Operate hands within camera view with good lighting.</p>
+    <p style="font-size: 0.85rem; color: #b9a692;">Operate hands within camera view with adequate lighting.</p>
     <div class="guide-grid">
       <div class="guide-card">
-        <h3>Thumb & Index Pinch</h3>
-        <p>Keep index finger pointing up and pinch/spread thumb to smoothly slide volume between 0% and 100%.</p>
+        <h3>1. Volume Control (Pinch)</h3>
+        <p>Keep your <strong>Index finger up</strong> and curl the other 3 fingers down. Move your <strong>Thumb</strong> closer or farther to smoothly slide the volume up and down.</p>
       </div>
       <div class="guide-card">
-        <h3>Closed Fist (Hold 1s)</h3>
-        <p>Fold all fingers into a closed fist to instantly toggle Mute / Unmute state.</p>
+        <h3>2. Closed Fist (Mute)</h3>
+        <p>Close all fingers into a <strong>tight fist</strong> and hold for 1 second until the confirmation bar fills to toggle Mute / Unmute.</p>
       </div>
       <div class="guide-card">
-        <h3>Open Palm (Hold 1s)</h3>
-        <p>Extend all 5 fingers straight to trigger Media Play / Pause on the audio stream.</p>
+        <h3>3. Open Palm (Play/Pause)</h3>
+        <p>Spread all <strong>5 fingers straight</strong> facing the camera and hold for 1 second until confirmed to toggle sound playback.</p>
       </div>
       <div class="guide-card">
-        <h3>Desktop Windows App</h3>
-        <p>To control OS-wide master Windows volume, clone the repo and run <code>python main.py</code> locally.</p>
+        <h3>Windows Master Audio App</h3>
+        <p>To control OS-level Windows master audio across Spotify, YouTube, and games, run <code>python main.py</code> locally on your PC.</p>
       </div>
     </div>
   </div>
@@ -345,15 +423,22 @@
     const canvasCtx = canvasElement.getContext('2d');
     const volumeText = document.getElementById('volume-text');
     const volumeFill = document.getElementById('volume-fill');
+    const confirmFill = document.getElementById('confirm-fill');
+    const confirmPercent = document.getElementById('confirm-percent');
     const gestureText = document.getElementById('gesture-text');
     const gapText = document.getElementById('gap-text');
+    const handStatus = document.getElementById('hand-status');
     const fpsCounter = document.getElementById('fps-counter');
     const modeBadge = document.getElementById('mode-badge');
     const actionMessage = document.getElementById('action-message');
-    const audioStateText = document.getElementById('audio-state-text');
     const toggleAudioBtn = document.getElementById('toggle-audio-btn');
     const toggleControlBtn = document.getElementById('toggle-control-btn');
     const synthSoundBtn = document.getElementById('synth-sound-btn');
+
+    const chipIndex = document.getElementById('chip-index');
+    const chipMiddle = document.getElementById('chip-middle');
+    const chipRing = document.getElementById('chip-ring');
+    const chipPinky = document.getElementById('chip-pinky');
 
     let currentVolume = 50;
     let smoothVolume = 50;
@@ -368,6 +453,8 @@
     let candidateSince = 0;
     let lastActionTime = 0;
     let gestureArmed = true;
+    const GESTURE_HOLD_TIME = 1.0;
+    const GESTURE_COOLDOWN = 1.2;
 
     // Web Audio Synthesizer to provide continuous audible feedback
     let audioCtx = null;
@@ -376,7 +463,12 @@
     let osc2 = null;
 
     function initAudio() {
-      if (audioCtx) return;
+      if (audioCtx) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        return;
+      }
       try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AudioContext();
@@ -396,9 +488,9 @@
 
         osc1.start();
         osc2.start();
-        audioStateText.textContent = "Synthesizer Active";
+        synthSoundBtn.textContent = "Sound Active (Click to Pause)";
       } catch (e) {
-        console.warn("Audio init deferred until user interaction", e);
+        console.warn("Audio init error", e);
       }
     }
 
@@ -408,7 +500,7 @@
         volumeText.textContent = `${Math.round(currentVolume)}%`;
         volumeFill.style.width = `${currentVolume}%`;
         if (masterGain && audioCtx) {
-          masterGain.gain.setTargetAtTime(currentVolume / 100 * 0.18, audioCtx.currentTime, 0.05);
+          masterGain.gain.setTargetAtTime(currentVolume / 100 * 0.18, audioCtx.currentTime, 0.04);
         }
       }
     }
@@ -436,13 +528,11 @@
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
         isPlaying = true;
-        audioStateText.textContent = "Playing Synth";
-        actionMessage.textContent = "Playback Resumed";
+        actionMessage.textContent = "Audio Resumed";
       } else if (audioCtx.state === 'running') {
         audioCtx.suspend();
         isPlaying = false;
-        audioStateText.textContent = "Paused";
-        actionMessage.textContent = "Playback Paused";
+        actionMessage.textContent = "Audio Paused";
       }
     }
 
@@ -453,8 +543,14 @@
 
     synthSoundBtn.addEventListener('click', () => {
       initAudio();
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume();
+      if (audioCtx) {
+        if (audioCtx.state === 'running') {
+          audioCtx.suspend();
+          synthSoundBtn.textContent = "Enable Sound Feedback";
+        } else {
+          audioCtx.resume();
+          synthSoundBtn.textContent = "Sound Active (Click to Pause)";
+        }
       }
     });
 
@@ -470,16 +566,24 @@
         controlEnabled = true;
         modeBadge.textContent = "MODE: ACTIVE";
         modeBadge.style.color = "#bbe045";
+        actionMessage.textContent = "Gestures Active";
       } else if (e.key === 'p' || e.key === 'P') {
         controlEnabled = false;
         modeBadge.textContent = "MODE: PAUSED";
         modeBadge.style.color = "#ff9637";
+        actionMessage.textContent = "Gestures Paused";
       } else if (e.key === 'm' || e.key === 'M') {
+        initAudio();
         toggleMute();
       }
     });
 
-    // Angle calculation for gestures
+    // Helper: Distance between two 2D points
+    function ptDist(p1, p2) {
+      return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    }
+
+    // Joint angle ABC with B being the middle knuckle
     function jointAngle(a, b, c) {
       const ba = [a.x - b.x, a.y - b.y];
       const bc = [c.x - b.x, c.y - b.y];
@@ -491,35 +595,78 @@
       return Math.acos(cos) * (180 / Math.PI);
     }
 
+    // Robust finger state classification combining angle + distance from wrist
+    function isExtended(landmarks, mcpIdx, pipIdx, tipIdx) {
+      const wrist = landmarks[0];
+      const mcp = landmarks[mcpIdx];
+      const pip = landmarks[pipIdx];
+      const tip = landmarks[tipIdx];
+
+      const angle = jointAngle(mcp, pip, tip);
+      const tipDist = ptDist(wrist, tip);
+      const pipDist = ptDist(wrist, pip);
+
+      // Extended: angle is straight (> 135 deg) AND tip is further out from wrist than knuckle
+      return angle >= 135 || (tipDist > pipDist * 1.15);
+    }
+
+    function isFolded(landmarks, mcpIdx, pipIdx, tipIdx) {
+      const wrist = landmarks[0];
+      const mcp = landmarks[mcpIdx];
+      const pip = landmarks[pipIdx];
+      const tip = landmarks[tipIdx];
+
+      const angle = jointAngle(mcp, pip, tip);
+      const tipDist = ptDist(wrist, tip);
+      const pipDist = ptDist(wrist, pip);
+
+      // Folded: curled back (angle <= 125) AND tip is closer to palm/wrist
+      return angle <= 125 || (tipDist < pipDist * 1.05);
+    }
+
     function recognizeGesture(landmarks) {
-      const fingers = {
-        index: jointAngle(landmarks[5], landmarks[6], landmarks[8]),
-        middle: jointAngle(landmarks[9], landmarks[10], landmarks[12]),
-        ring: jointAngle(landmarks[13], landmarks[14], landmarks[16]),
-        pinky: jointAngle(landmarks[17], landmarks[18], landmarks[20])
-      };
+      const indexExt = isExtended(landmarks, 5, 6, 8);
+      const indexFold = isFolded(landmarks, 5, 6, 8);
 
-      const EXTENDED = 150;
-      const FOLDED = 115;
+      const middleExt = isExtended(landmarks, 9, 10, 12);
+      const middleFold = isFolded(landmarks, 9, 10, 12);
 
-      const states = {
-        index: fingers.index >= EXTENDED ? "extended" : (fingers.index <= FOLDED ? "folded" : "partial"),
-        middle: fingers.middle >= EXTENDED ? "extended" : (fingers.middle <= FOLDED ? "folded" : "partial"),
-        ring: fingers.ring >= EXTENDED ? "extended" : (fingers.ring <= FOLDED ? "folded" : "partial"),
-        pinky: fingers.pinky >= EXTENDED ? "extended" : (fingers.pinky <= FOLDED ? "folded" : "partial")
-      };
+      const ringExt = isExtended(landmarks, 13, 14, 16);
+      const ringFold = isFolded(landmarks, 13, 14, 16);
 
-      if (states.index === "extended" && states.middle === "extended" && states.ring === "extended" && states.pinky === "extended") {
+      const pinkyExt = isExtended(landmarks, 17, 18, 20);
+      const pinkyFold = isFolded(landmarks, 17, 18, 20);
+
+      // Update HUD chips
+      chipIndex.className = 'finger-chip' + (indexExt ? ' active' : '');
+      chipMiddle.className = 'finger-chip' + (middleExt ? ' active' : '');
+      chipRing.className = 'finger-chip' + (ringExt ? ' active' : '');
+      chipPinky.className = 'finger-chip' + (pinkyExt ? ' active' : '');
+
+      chipIndex.textContent = indexExt ? 'Index UP' : 'Index DN';
+      chipMiddle.textContent = middleExt ? 'Mid UP' : 'Mid DN';
+      chipRing.textContent = ringExt ? 'Ring UP' : 'Ring DN';
+      chipPinky.textContent = pinkyExt ? 'Pinky UP' : 'Pinky DN';
+
+      // 1. OPEN PALM (Media Play / Pause): All 4 fingers extended
+      if (indexExt && middleExt && ringExt && pinkyExt) {
         return "PLAY_PAUSE";
       }
-      if (states.index === "folded" && states.middle === "folded" && states.ring === "folded" && states.pinky === "folded") {
+
+      // 2. CLOSED FIST (Mute / Unmute): All 4 fingers folded
+      if (indexFold && middleFold && ringFold && pinkyFold) {
         return "MUTE";
       }
-      if (states.index === "extended" && states.middle === "folded" && states.ring === "folded" && states.pinky === "folded") {
+
+      // 3. VOLUME: Only Index extended, others folded/curled
+      if (indexExt && !middleExt && !ringExt && !pinkyExt) {
         return "VOLUME";
       }
+
       return "NONE";
     }
+
+    let canvasSized = false;
 
     function onResults(results) {
       const now = performance.now();
@@ -531,20 +678,30 @@
         lastTime = now;
       }
 
-      canvasElement.width = videoElement.videoWidth || 640;
-      canvasElement.height = videoElement.videoHeight || 480;
+      if (!canvasSized && videoElement.videoWidth) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        canvasSized = true;
+      }
+
+      const cw = canvasElement.width || 640;
+      const ch = canvasElement.height || 480;
 
       canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.clearRect(0, 0, cw, ch);
+      canvasCtx.drawImage(results.image, 0, 0, cw, ch);
 
       let detectedGesture = "NONE";
+      let progress = 0;
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        handStatus.textContent = "Hand Tracked";
+        handStatus.style.color = "#bbe045";
+
         const landmarks = results.multiHandLandmarks[0];
         detectedGesture = recognizeGesture(landmarks);
 
-        // Draw connections
+        // Draw hand skeleton
         const connections = [
           [0,1],[1,2],[2,3],[3,4],
           [0,5],[5,6],[6,7],[7,8],
@@ -554,99 +711,126 @@
           [0,17]
         ];
 
-        canvasCtx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        canvasCtx.strokeStyle = "rgba(255, 255, 255, 0.85)";
         canvasCtx.lineWidth = 3;
         connections.forEach(([i, j]) => {
           canvasCtx.beginPath();
-          canvasCtx.moveTo(landmarks[i].x * canvasElement.width, landmarks[i].y * canvasElement.height);
-          canvasCtx.lineTo(landmarks[j].x * canvasElement.width, landmarks[j].y * canvasElement.height);
+          canvasCtx.moveTo(landmarks[i].x * cw, landmarks[i].y * ch);
+          canvasCtx.lineTo(landmarks[j].x * cw, landmarks[j].y * ch);
           canvasCtx.stroke();
         });
 
-        // Draw points
+        // Draw landmark points
         landmarks.forEach((pt, idx) => {
           canvasCtx.beginPath();
-          canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, (idx === 4 || idx === 8) ? 8 : 4, 0, 2 * Math.PI);
+          canvasCtx.arc(pt.x * cw, pt.y * ch, (idx === 4 || idx === 8) ? 9 : 5, 0, 2 * Math.PI);
           canvasCtx.fillStyle = idx === 4 ? "#e140e0" : (idx === 8 ? "#ff9637" : "#bbe045");
           canvasCtx.fill();
         });
 
         const thumb = landmarks[4];
         const index = landmarks[8];
-        const dx = (thumb.x - index.x) * canvasElement.width;
-        const dy = (thumb.y - index.y) * canvasElement.height;
+        const dx = (thumb.x - index.x) * cw;
+        const dy = (thumb.y - index.y) * ch;
         const dist = Math.hypot(dx, dy);
-        gapText.textContent = Math.round(dist);
+        gapText.textContent = `${Math.round(dist)} px`;
 
-        // Draw line between thumb and index
+        // Connect Thumb and Index with prominent line
         canvasCtx.beginPath();
-        canvasCtx.moveTo(thumb.x * canvasElement.width, thumb.y * canvasElement.height);
-        canvasCtx.lineTo(index.x * canvasElement.width, index.y * canvasElement.height);
+        canvasCtx.moveTo(thumb.x * cw, thumb.y * ch);
+        canvasCtx.lineTo(index.x * cw, index.y * ch);
         canvasCtx.strokeStyle = "#e140e0";
         canvasCtx.lineWidth = 4;
         canvasCtx.stroke();
 
-        // VOLUME ADJUSTMENT
+        // ---------------- VOLUME SLIDER ----------------
         if (controlEnabled && detectedGesture === "VOLUME") {
           const minGap = 20;
-          const maxGap = 210;
+          const maxGap = 190;
           const target = Math.max(0, Math.min(100, ((dist - minGap) / (maxGap - minGap)) * 100));
-          smoothVolume = 0.85 * smoothVolume + 0.15 * target;
+          smoothVolume = 0.80 * smoothVolume + 0.20 * target;
           setVolume(smoothVolume);
-          actionMessage.textContent = "Adjusting Volume";
+          actionMessage.textContent = `Adjusting Volume (${Math.round(smoothVolume)}%)`;
         }
 
-        // DISCRETE GESTURES (MUTE / PLAY_PAUSE)
-        if (controlEnabled && (detectedGesture === "MUTE" || detectedGesture === "PLAY_PAUSE")) {
+        // ---------------- DISCRETE GESTURES (MUTE / PLAY_PAUSE) ----------------
+        const isDiscrete = controlEnabled && (detectedGesture === "MUTE" || detectedGesture === "PLAY_PAUSE");
+
+        if (isDiscrete) {
           if (candidate !== detectedGesture) {
             candidate = detectedGesture;
             candidateSince = now;
+            gestureArmed = true;
           }
+
           const held = (now - candidateSince) / 1000;
-          if (held >= 1.0 && (now - lastActionTime) / 1000 >= 1.5) {
+          progress = Math.min(held / GESTURE_HOLD_TIME, 1.0);
+
+          if (gestureArmed && held >= GESTURE_HOLD_TIME && (now - lastActionTime) / 1000 >= GESTURE_COOLDOWN) {
             if (candidate === "MUTE") {
+              initAudio();
               toggleMute();
             } else if (candidate === "PLAY_PAUSE") {
+              initAudio();
               togglePlayPause();
             }
             lastActionTime = now;
-            candidate = "NONE";
+            gestureArmed = false;
+            progress = 1.0;
           }
         } else {
           candidate = "NONE";
+          progress = 0;
+          gestureArmed = true;
+          if (controlEnabled && detectedGesture === "NONE") {
+            actionMessage.textContent = "Gestures Active";
+          }
         }
       } else {
-        gapText.textContent = "0";
+        handStatus.textContent = "Searching...";
+        handStatus.style.color = "#ffd246";
+        gapText.textContent = "0 px";
+        progress = 0;
+        candidate = "NONE";
+        chipIndex.className = 'finger-chip';
+        chipMiddle.className = 'finger-chip';
+        chipRing.className = 'finger-chip';
+        chipPinky.className = 'finger-chip';
       }
 
       gestureText.textContent = detectedGesture;
+      confirmFill.style.width = `${Math.round(progress * 100)}%`;
+      confirmPercent.textContent = `${Math.round(progress * 100)}%`;
+
       canvasCtx.restore();
     }
 
+    // Initialize MediaPipe Hands
     const hands = new Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
 
     hands.setOptions({
       maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
+      modelComplexity: 0, // Lite model is fast and responsive in all browsers
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
     });
 
     hands.onResults(onResults);
 
+    // Initialize Camera feed (640x480 standard resolution for fast WASM processing)
     const camera = new Camera(videoElement, {
       onFrame: async () => {
         await hands.send({ image: videoElement });
       },
-      width: 1280,
-      height: 720
+      width: 640,
+      height: 480
     });
 
     camera.start().catch((err) => {
       console.error("Camera error:", err);
-      actionMessage.textContent = "Webcam access denied or unavailable";
+      actionMessage.textContent = "Camera permission denied or camera in use";
     });
 
     document.body.addEventListener('click', () => {
