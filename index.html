@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Hand Gesture Volume Controller | Live Demo</title>
+  <!-- MediaPipe dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: #120e0a;
+      color: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    header {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      background: #1c130c;
+      border: 1px solid #312316;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .brand h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #bbe045;
+      letter-spacing: 1px;
+    }
+    .brand p {
+      font-size: 0.8rem;
+      color: #b9a692;
+      margin-top: 2px;
+    }
+    .links a {
+      color: #bbe045;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid #bbe045;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .links a:hover {
+      background: #bbe045;
+      color: #1c130c;
+    }
+    .main-container {
+      width: 100%;
+      max-width: 1200px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+    }
+    .stage-card {
+      position: relative;
+      background: #18120c;
+      border: 1px solid #312316;
+      border-radius: 16px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+    video {
+      display: none;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    .hud-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      background: rgba(28, 19, 12, 0.85);
+      border: 1px solid #44301d;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .hud-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .status-pill {
+      background: rgba(28, 19, 12, 0.9);
+      border: 1px solid #44301d;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      color: #ffd246;
+    }
+    .controls-panel {
+      background: #1c130c;
+      border: 1px solid #312316;
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .meter-box {
+      background: #140d07;
+      border: 1px solid #312316;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .meter-label {
+      font-size: 0.75rem;
+      color: #b9a692;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .meter-value {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: #bbe045;
+      margin: 8px 0;
+    }
+    .meter-bar-container {
+      width: 100%;
+      height: 14px;
+      background: #2a1c10;
+      border-radius: 7px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .meter-bar-fill {
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, #bbe045, #46d2ff);
+      transition: width 0.08s ease-out;
+    }
+    .info-group {
+      background: #140d07;
+      border: 1px solid #312316;
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+    }
+    .info-row span:first-child {
+      color: #b9a692;
+    }
+    .info-row span:last-child {
+      font-weight: 600;
+      color: #f5f5f5;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn {
+      padding: 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #bbe045;
+      color: #120e0a;
+    }
+    .btn-primary:hover {
+      background: #cbf255;
+    }
+    .btn-secondary {
+      background: #2a1c10;
+      color: #f5f5f5;
+      border: 1px solid #44301d;
+    }
+    .btn-secondary:hover {
+      background: #392616;
+    }
+    .guide-section {
+      width: 100%;
+      max-width: 1200px;
+      margin-top: 24px;
+      background: #1c130c;
+      border: 1px solid #312316;
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .guide-card {
+      background: #140d07;
+      border: 1px solid #312316;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .guide-card h3 {
+      font-size: 1rem;
+      color: #46d2ff;
+      margin-bottom: 8px;
+    }
+    .guide-card p {
+      font-size: 0.85rem;
+      color: #b9a692;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <h1>AI GESTURE STUDIO</h1>
+      <p>Real-Time Touchless Volume & Media Controller</p>
+    </div>
+    <div class="links">
+      <a href="https://github.com/Paradoxai77/Volume-Controller" target="_blank" rel="noopener">GitHub Repository</a>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div class="stage-card">
+      <video id="webcam" playsinline autoplay muted></video>
+      <canvas id="output-canvas"></canvas>
+      <div class="hud-overlay">
+        <div class="hud-top">
+          <div class="badge" id="fps-counter">FPS: 0</div>
+          <div class="badge" id="mode-badge" style="color: #bbe045;">MODE: ACTIVE</div>
+        </div>
+        <div class="hud-bottom">
+          <div class="status-pill" id="action-message">Show hand to camera</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-panel">
+      <div class="meter-box">
+        <div class="meter-label">Audio Volume</div>
+        <div class="meter-value" id="volume-text">50%</div>
+        <div class="meter-bar-container">
+          <div class="meter-bar-fill" id="volume-fill"></div>
+        </div>
+      </div>
+
+      <div class="info-group">
+        <div class="info-row">
+          <span>Detected Gesture:</span>
+          <span id="gesture-text" style="color: #46d2ff;">NONE</span>
+        </div>
+        <div class="info-row">
+          <span>Pinch Distance:</span>
+          <span id="gap-text">0</span>
+        </div>
+        <div class="info-row">
+          <span>Audio Playback:</span>
+          <span id="audio-state-text" style="color: #ffd246;">Playing Synth</span>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" id="toggle-audio-btn">Mute / Unmute Audio</button>
+        <button class="btn btn-secondary" id="toggle-control-btn">Pause / Resume Gestures (P/C)</button>
+        <button class="btn btn-secondary" id="synth-sound-btn">Restart Sound Synthesizer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-section">
+    <h2 style="font-size: 1.2rem; color: #f5f5f5; margin-bottom: 4px;">Gesture Control Guide</h2>
+    <p style="font-size: 0.85rem; color: #b9a692;">Operate hands within camera view with good lighting.</p>
+    <div class="guide-grid">
+      <div class="guide-card">
+        <h3>Thumb & Index Pinch</h3>
+        <p>Keep index finger pointing up and pinch/spread thumb to smoothly slide volume between 0% and 100%.</p>
+      </div>
+      <div class="guide-card">
+        <h3>Closed Fist (Hold 1s)</h3>
+        <p>Fold all fingers into a closed fist to instantly toggle Mute / Unmute state.</p>
+      </div>
+      <div class="guide-card">
+        <h3>Open Palm (Hold 1s)</h3>
+        <p>Extend all 5 fingers straight to trigger Media Play / Pause on the audio stream.</p>
+      </div>
+      <div class="guide-card">
+        <h3>Desktop Windows App</h3>
+        <p>To control OS-wide master Windows volume, clone the repo and run <code>python main.py</code> locally.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output-canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const volumeText = document.getElementById('volume-text');
+    const volumeFill = document.getElementById('volume-fill');
+    const gestureText = document.getElementById('gesture-text');
+    const gapText = document.getElementById('gap-text');
+    const fpsCounter = document.getElementById('fps-counter');
+    const modeBadge = document.getElementById('mode-badge');
+    const actionMessage = document.getElementById('action-message');
+    const audioStateText = document.getElementById('audio-state-text');
+    const toggleAudioBtn = document.getElementById('toggle-audio-btn');
+    const toggleControlBtn = document.getElementById('toggle-control-btn');
+    const synthSoundBtn = document.getElementById('synth-sound-btn');
+
+    let currentVolume = 50;
+    let smoothVolume = 50;
+    let isMuted = false;
+    let controlEnabled = true;
+    let isPlaying = true;
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    let candidate = "NONE";
+    let candidateSince = 0;
+    let lastActionTime = 0;
+    let gestureArmed = true;
+
+    // Web Audio Synthesizer to provide continuous audible feedback
+    let audioCtx = null;
+    let masterGain = null;
+    let osc1 = null;
+    let osc2 = null;
+
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(currentVolume / 100 * 0.15, audioCtx.currentTime);
+
+        osc1 = audioCtx.createOscillator();
+        osc2 = audioCtx.createOscillator();
+        osc1.type = 'sine';
+        osc2.type = 'triangle';
+        osc1.frequency.setValueAtTime(220, audioCtx.currentTime); // A3 note
+        osc2.frequency.setValueAtTime(330, audioCtx.currentTime); // E4 note
+
+        osc1.connect(masterGain);
+        osc2.connect(masterGain);
+        masterGain.connect(audioCtx.destination);
+
+        osc1.start();
+        osc2.start();
+        audioStateText.textContent = "Synthesizer Active";
+      } catch (e) {
+        console.warn("Audio init deferred until user interaction", e);
+      }
+    }
+
+    function setVolume(vol) {
+      currentVolume = Math.max(0, Math.min(100, vol));
+      if (!isMuted) {
+        volumeText.textContent = `${Math.round(currentVolume)}%`;
+        volumeFill.style.width = `${currentVolume}%`;
+        if (masterGain && audioCtx) {
+          masterGain.gain.setTargetAtTime(currentVolume / 100 * 0.18, audioCtx.currentTime, 0.05);
+        }
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      if (isMuted) {
+        volumeText.textContent = "MUTED";
+        volumeFill.style.width = `0%`;
+        if (masterGain && audioCtx) {
+          masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.02);
+        }
+        actionMessage.textContent = "Audio Muted";
+      } else {
+        setVolume(currentVolume);
+        actionMessage.textContent = "Audio Unmuted";
+      }
+    }
+
+    function togglePlayPause() {
+      if (!audioCtx) {
+        initAudio();
+        return;
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+        isPlaying = true;
+        audioStateText.textContent = "Playing Synth";
+        actionMessage.textContent = "Playback Resumed";
+      } else if (audioCtx.state === 'running') {
+        audioCtx.suspend();
+        isPlaying = false;
+        audioStateText.textContent = "Paused";
+        actionMessage.textContent = "Playback Paused";
+      }
+    }
+
+    toggleAudioBtn.addEventListener('click', () => {
+      initAudio();
+      toggleMute();
+    });
+
+    synthSoundBtn.addEventListener('click', () => {
+      initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    });
+
+    toggleControlBtn.addEventListener('click', () => {
+      controlEnabled = !controlEnabled;
+      modeBadge.textContent = controlEnabled ? "MODE: ACTIVE" : "MODE: PAUSED";
+      modeBadge.style.color = controlEnabled ? "#bbe045" : "#ff9637";
+      actionMessage.textContent = controlEnabled ? "Gestures Active" : "Gestures Paused";
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'c' || e.key === 'C') {
+        controlEnabled = true;
+        modeBadge.textContent = "MODE: ACTIVE";
+        modeBadge.style.color = "#bbe045";
+      } else if (e.key === 'p' || e.key === 'P') {
+        controlEnabled = false;
+        modeBadge.textContent = "MODE: PAUSED";
+        modeBadge.style.color = "#ff9637";
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleMute();
+      }
+    });
+
+    // Angle calculation for gestures
+    function jointAngle(a, b, c) {
+      const ba = [a.x - b.x, a.y - b.y];
+      const bc = [c.x - b.x, c.y - b.y];
+      const dot = ba[0] * bc[0] + ba[1] * bc[1];
+      const magBa = Math.hypot(ba[0], ba[1]);
+      const magBc = Math.hypot(bc[0], bc[1]);
+      if (magBa * magBc < 1e-6) return 0;
+      const cos = Math.min(1.0, Math.max(-1.0, dot / (magBa * magBc)));
+      return Math.acos(cos) * (180 / Math.PI);
+    }
+
+    function recognizeGesture(landmarks) {
+      const fingers = {
+        index: jointAngle(landmarks[5], landmarks[6], landmarks[8]),
+        middle: jointAngle(landmarks[9], landmarks[10], landmarks[12]),
+        ring: jointAngle(landmarks[13], landmarks[14], landmarks[16]),
+        pinky: jointAngle(landmarks[17], landmarks[18], landmarks[20])
+      };
+
+      const EXTENDED = 150;
+      const FOLDED = 115;
+
+      const states = {
+        index: fingers.index >= EXTENDED ? "extended" : (fingers.index <= FOLDED ? "folded" : "partial"),
+        middle: fingers.middle >= EXTENDED ? "extended" : (fingers.middle <= FOLDED ? "folded" : "partial"),
+        ring: fingers.ring >= EXTENDED ? "extended" : (fingers.ring <= FOLDED ? "folded" : "partial"),
+        pinky: fingers.pinky >= EXTENDED ? "extended" : (fingers.pinky <= FOLDED ? "folded" : "partial")
+      };
+
+      if (states.index === "extended" && states.middle === "extended" && states.ring === "extended" && states.pinky === "extended") {
+        return "PLAY_PAUSE";
+      }
+      if (states.index === "folded" && states.middle === "folded" && states.ring === "folded" && states.pinky === "folded") {
+        return "MUTE";
+      }
+      if (states.index === "extended" && states.middle === "folded" && states.ring === "folded" && states.pinky === "folded") {
+        return "VOLUME";
+      }
+      return "NONE";
+    }
+
+    function onResults(results) {
+      const now = performance.now();
+      frameCount++;
+      if (now - lastTime >= 1000) {
+        fps = Math.round((frameCount * 1000) / (now - lastTime));
+        fpsCounter.textContent = `FPS: ${fps}`;
+        frameCount = 0;
+        lastTime = now;
+      }
+
+      canvasElement.width = videoElement.videoWidth || 640;
+      canvasElement.height = videoElement.videoHeight || 480;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      let detectedGesture = "NONE";
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        detectedGesture = recognizeGesture(landmarks);
+
+        // Draw connections
+        const connections = [
+          [0,1],[1,2],[2,3],[3,4],
+          [0,5],[5,6],[6,7],[7,8],
+          [5,9],[9,10],[10,11],[11,12],
+          [9,13],[13,14],[14,15],[15,16],
+          [13,17],[17,18],[18,19],[19,20],
+          [0,17]
+        ];
+
+        canvasCtx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        canvasCtx.lineWidth = 3;
+        connections.forEach(([i, j]) => {
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(landmarks[i].x * canvasElement.width, landmarks[i].y * canvasElement.height);
+          canvasCtx.lineTo(landmarks[j].x * canvasElement.width, landmarks[j].y * canvasElement.height);
+          canvasCtx.stroke();
+        });
+
+        // Draw points
+        landmarks.forEach((pt, idx) => {
+          canvasCtx.beginPath();
+          canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, (idx === 4 || idx === 8) ? 8 : 4, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = idx === 4 ? "#e140e0" : (idx === 8 ? "#ff9637" : "#bbe045");
+          canvasCtx.fill();
+        });
+
+        const thumb = landmarks[4];
+        const index = landmarks[8];
+        const dx = (thumb.x - index.x) * canvasElement.width;
+        const dy = (thumb.y - index.y) * canvasElement.height;
+        const dist = Math.hypot(dx, dy);
+        gapText.textContent = Math.round(dist);
+
+        // Draw line between thumb and index
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(thumb.x * canvasElement.width, thumb.y * canvasElement.height);
+        canvasCtx.lineTo(index.x * canvasElement.width, index.y * canvasElement.height);
+        canvasCtx.strokeStyle = "#e140e0";
+        canvasCtx.lineWidth = 4;
+        canvasCtx.stroke();
+
+        // VOLUME ADJUSTMENT
+        if (controlEnabled && detectedGesture === "VOLUME") {
+          const minGap = 20;
+          const maxGap = 210;
+          const target = Math.max(0, Math.min(100, ((dist - minGap) / (maxGap - minGap)) * 100));
+          smoothVolume = 0.85 * smoothVolume + 0.15 * target;
+          setVolume(smoothVolume);
+          actionMessage.textContent = "Adjusting Volume";
+        }
+
+        // DISCRETE GESTURES (MUTE / PLAY_PAUSE)
+        if (controlEnabled && (detectedGesture === "MUTE" || detectedGesture === "PLAY_PAUSE")) {
+          if (candidate !== detectedGesture) {
+            candidate = detectedGesture;
+            candidateSince = now;
+          }
+          const held = (now - candidateSince) / 1000;
+          if (held >= 1.0 && (now - lastActionTime) / 1000 >= 1.5) {
+            if (candidate === "MUTE") {
+              toggleMute();
+            } else if (candidate === "PLAY_PAUSE") {
+              togglePlayPause();
+            }
+            lastActionTime = now;
+            candidate = "NONE";
+          }
+        } else {
+          candidate = "NONE";
+        }
+      } else {
+        gapText.textContent = "0";
+      }
+
+      gestureText.textContent = detectedGesture;
+      canvasCtx.restore();
+    }
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+
+    hands.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({ image: videoElement });
+      },
+      width: 1280,
+      height: 720
+    });
+
+    camera.start().catch((err) => {
+      console.error("Camera error:", err);
+      actionMessage.textContent = "Webcam access denied or unavailable";
+    });
+
+    document.body.addEventListener('click', () => {
+      initAudio();
+    }, { once: true });
+  </script>
+</body>
+</html>
