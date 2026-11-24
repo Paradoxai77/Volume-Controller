@@ -6,6 +6,7 @@
   <title>AI Hand Gesture Volume Controller | Live Demo</title>
   <!-- MediaPipe dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <style>
     * {
@@ -84,7 +85,7 @@
       justify-content: center;
       box-shadow: 0 12px 30px rgba(0,0,0,0.5);
     }
-    /* Hidden video element MUST remain in layout for browser to decode frames */
+    /* Hidden active video element */
     #webcam {
       position: absolute;
       top: 0;
@@ -99,7 +100,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scaleX(-1); /* Mirror canvas visually for intuitive user perspective */
+      transform: scaleX(-1); /* Mirror canvas horizontally for natural selfie view */
     }
     .hud-overlay {
       position: absolute;
@@ -185,7 +186,6 @@
       background: linear-gradient(90deg, #bbe045, #46d2ff);
       transition: width 0.08s ease-out;
     }
-    /* Gesture confirmation progress bar matching main.py */
     .confirmation-box {
       margin-top: 10px;
       text-align: left;
@@ -330,9 +330,8 @@
 
   <div class="main-container">
     <div class="stage-card">
-      <!-- Hidden video element decoded by browser -->
       <video id="webcam" playsinline autoplay muted></video>
-      <canvas id="output-canvas"></canvas>
+      <canvas id="output-canvas" width="640" height="480"></canvas>
       <div class="hud-overlay">
         <div class="hud-top">
           <div class="badge" id="fps-counter">FPS: 0</div>
@@ -354,7 +353,7 @@
         
         <div class="confirmation-box">
           <div class="confirmation-label">
-            <span>Gesture Hold Confirm</span>
+            <span>Gesture Confirmation</span>
             <span id="confirm-percent">0%</span>
           </div>
           <div class="confirmation-track">
@@ -373,11 +372,11 @@
           <span id="gap-text">0 px</span>
         </div>
         <div class="info-row">
-          <span>Hand Tracking:</span>
+          <span>Hand Detection:</span>
           <span id="hand-status" style="color: #ffd246;">Searching...</span>
         </div>
 
-        <div style="font-size: 0.72rem; color: #b9a692; margin-top: 6px;">Finger States:</div>
+        <div style="font-size: 0.72rem; color: #b9a692; margin-top: 6px;">Fingers Extended:</div>
         <div class="chips-row">
           <div class="finger-chip" id="chip-index">Index</div>
           <div class="finger-chip" id="chip-middle">Middle</div>
@@ -387,32 +386,32 @@
       </div>
 
       <div class="btn-group">
-        <button class="btn btn-primary" id="toggle-audio-btn">Mute / Unmute Audio (M)</button>
+        <button class="btn btn-primary" id="synth-sound-btn">🔊 Click to Start Audio Feedback</button>
+        <button class="btn btn-secondary" id="toggle-audio-btn">Mute / Unmute (M)</button>
         <button class="btn btn-secondary" id="toggle-control-btn">Pause / Resume Gestures (P/C)</button>
-        <button class="btn btn-secondary" id="synth-sound-btn">Enable Sound Feedback</button>
       </div>
     </div>
   </div>
 
   <div class="guide-section">
-    <h2 style="font-size: 1.2rem; color: #f5f5f5; margin-bottom: 4px;">Gesture Control Guide</h2>
-    <p style="font-size: 0.85rem; color: #b9a692;">Operate hands within camera view with adequate lighting.</p>
+    <h2 style="font-size: 1.2rem; color: #f5f5f5; margin-bottom: 4px;">How Gesture Recognition Works</h2>
+    <p style="font-size: 0.85rem; color: #b9a692;">Operate your hand within camera view:</p>
     <div class="guide-grid">
       <div class="guide-card">
         <h3>1. Volume Control (Pinch)</h3>
-        <p>Keep your <strong>Index finger up</strong> and curl the other 3 fingers down. Move your <strong>Thumb</strong> closer or farther to smoothly slide the volume up and down.</p>
+        <p>Spread or pinch your <strong>Thumb</strong> and <strong>Index finger</strong> to slide the volume between 0% and 100%.</p>
       </div>
       <div class="guide-card">
         <h3>2. Closed Fist (Mute)</h3>
-        <p>Close all fingers into a <strong>tight fist</strong> and hold for 1 second until the confirmation bar fills to toggle Mute / Unmute.</p>
+        <p>Make a <strong>closed fist</strong> and hold for 0.8s until confirmed to toggle Mute / Unmute.</p>
       </div>
       <div class="guide-card">
         <h3>3. Open Palm (Play/Pause)</h3>
-        <p>Spread all <strong>5 fingers straight</strong> facing the camera and hold for 1 second until confirmed to toggle sound playback.</p>
+        <p>Show an <strong>open flat hand (5 straight fingers)</strong> and hold for 0.8s to toggle audio playback.</p>
       </div>
       <div class="guide-card">
         <h3>Windows Master Audio App</h3>
-        <p>To control OS-level Windows master audio across Spotify, YouTube, and games, run <code>python main.py</code> locally on your PC.</p>
+        <p>To control your entire PC master audio (Spotify, games, system apps), run <code>python main.py</code> locally on Windows.</p>
       </div>
     </div>
   </div>
@@ -444,7 +443,6 @@
     let smoothVolume = 50;
     let isMuted = false;
     let controlEnabled = true;
-    let isPlaying = true;
     let lastTime = performance.now();
     let frameCount = 0;
     let fps = 0;
@@ -453,10 +451,10 @@
     let candidateSince = 0;
     let lastActionTime = 0;
     let gestureArmed = true;
-    const GESTURE_HOLD_TIME = 1.0;
-    const GESTURE_COOLDOWN = 1.2;
+    const GESTURE_HOLD_TIME = 0.8;
+    const GESTURE_COOLDOWN = 1.0;
 
-    // Web Audio Synthesizer to provide continuous audible feedback
+    // Web Audio Synthesizer
     let audioCtx = null;
     let masterGain = null;
     let osc1 = null;
@@ -466,6 +464,8 @@
       if (audioCtx) {
         if (audioCtx.state === 'suspended') {
           audioCtx.resume();
+          synthSoundBtn.textContent = "🔊 Audio Active (Playing)";
+          actionMessage.textContent = "Audio Playing";
         }
         return;
       }
@@ -473,14 +473,14 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AudioContext();
         masterGain = audioCtx.createGain();
-        masterGain.gain.setValueAtTime(currentVolume / 100 * 0.15, audioCtx.currentTime);
+        masterGain.gain.setValueAtTime((currentVolume / 100) * 0.15, audioCtx.currentTime);
 
         osc1 = audioCtx.createOscillator();
         osc2 = audioCtx.createOscillator();
         osc1.type = 'sine';
         osc2.type = 'triangle';
-        osc1.frequency.setValueAtTime(220, audioCtx.currentTime); // A3 note
-        osc2.frequency.setValueAtTime(330, audioCtx.currentTime); // E4 note
+        osc1.frequency.setValueAtTime(261.63, audioCtx.currentTime); // C4 note
+        osc2.frequency.setValueAtTime(329.63, audioCtx.currentTime); // E4 note
 
         osc1.connect(masterGain);
         osc2.connect(masterGain);
@@ -488,7 +488,8 @@
 
         osc1.start();
         osc2.start();
-        synthSoundBtn.textContent = "Sound Active (Click to Pause)";
+        synthSoundBtn.textContent = "🔊 Audio Active (Playing)";
+        actionMessage.textContent = "Audio Playing";
       } catch (e) {
         console.warn("Audio init error", e);
       }
@@ -500,7 +501,7 @@
         volumeText.textContent = `${Math.round(currentVolume)}%`;
         volumeFill.style.width = `${currentVolume}%`;
         if (masterGain && audioCtx) {
-          masterGain.gain.setTargetAtTime(currentVolume / 100 * 0.18, audioCtx.currentTime, 0.04);
+          masterGain.gain.setTargetAtTime((currentVolume / 100) * 0.18, audioCtx.currentTime, 0.04);
         }
       }
     }
@@ -527,31 +528,26 @@
       }
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
-        isPlaying = true;
+        synthSoundBtn.textContent = "🔊 Audio Active (Playing)";
         actionMessage.textContent = "Audio Resumed";
       } else if (audioCtx.state === 'running') {
         audioCtx.suspend();
-        isPlaying = false;
+        synthSoundBtn.textContent = "🔇 Audio Paused (Click to Play)";
         actionMessage.textContent = "Audio Paused";
       }
     }
 
+    synthSoundBtn.addEventListener('click', () => {
+      initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+        synthSoundBtn.textContent = "🔊 Audio Active (Playing)";
+      }
+    });
+
     toggleAudioBtn.addEventListener('click', () => {
       initAudio();
       toggleMute();
-    });
-
-    synthSoundBtn.addEventListener('click', () => {
-      initAudio();
-      if (audioCtx) {
-        if (audioCtx.state === 'running') {
-          audioCtx.suspend();
-          synthSoundBtn.textContent = "Enable Sound Feedback";
-        } else {
-          audioCtx.resume();
-          synthSoundBtn.textContent = "Sound Active (Click to Pause)";
-        }
-      }
     });
 
     toggleControlBtn.addEventListener('click', () => {
@@ -578,95 +574,45 @@
       }
     });
 
-    // Helper: Distance between two 2D points
     function ptDist(p1, p2) {
       return Math.hypot(p1.x - p2.x, p1.y - p2.y);
     }
 
-    // Joint angle ABC with B being the middle knuckle
-    function jointAngle(a, b, c) {
-      const ba = [a.x - b.x, a.y - b.y];
-      const bc = [c.x - b.x, c.y - b.y];
-      const dot = ba[0] * bc[0] + ba[1] * bc[1];
-      const magBa = Math.hypot(ba[0], ba[1]);
-      const magBc = Math.hypot(bc[0], bc[1]);
-      if (magBa * magBc < 1e-6) return 0;
-      const cos = Math.min(1.0, Math.max(-1.0, dot / (magBa * magBc)));
-      return Math.acos(cos) * (180 / Math.PI);
-    }
-
-    // Robust finger state classification combining angle + distance from wrist
-    function isExtended(landmarks, mcpIdx, pipIdx, tipIdx) {
+    // High-reliability gesture recognition
+    function analyzeHand(landmarks) {
       const wrist = landmarks[0];
-      const mcp = landmarks[mcpIdx];
-      const pip = landmarks[pipIdx];
-      const tip = landmarks[tipIdx];
 
-      const angle = jointAngle(mcp, pip, tip);
-      const tipDist = ptDist(wrist, tip);
-      const pipDist = ptDist(wrist, pip);
-
-      // Extended: angle is straight (> 135 deg) AND tip is further out from wrist than knuckle
-      return angle >= 135 || (tipDist > pipDist * 1.15);
-    }
-
-    function isFolded(landmarks, mcpIdx, pipIdx, tipIdx) {
-      const wrist = landmarks[0];
-      const mcp = landmarks[mcpIdx];
-      const pip = landmarks[pipIdx];
-      const tip = landmarks[tipIdx];
-
-      const angle = jointAngle(mcp, pip, tip);
-      const tipDist = ptDist(wrist, tip);
-      const pipDist = ptDist(wrist, pip);
-
-      // Folded: curled back (angle <= 125) AND tip is closer to palm/wrist
-      return angle <= 125 || (tipDist < pipDist * 1.05);
-    }
-
-    function recognizeGesture(landmarks) {
-      const indexExt = isExtended(landmarks, 5, 6, 8);
-      const indexFold = isFolded(landmarks, 5, 6, 8);
-
-      const middleExt = isExtended(landmarks, 9, 10, 12);
-      const middleFold = isFolded(landmarks, 9, 10, 12);
-
-      const ringExt = isExtended(landmarks, 13, 14, 16);
-      const ringFold = isFolded(landmarks, 13, 14, 16);
-
-      const pinkyExt = isExtended(landmarks, 17, 18, 20);
-      const pinkyFold = isFolded(landmarks, 17, 18, 20);
+      // Finger tips: 4 (thumb), 8 (index), 12 (middle), 16 (ring), 20 (pinky)
+      // Finger PIPs (middle joints): 2 (thumb), 6 (index), 10 (middle), 14 (ring), 18 (pinky)
+      const indexExt = ptDist(wrist, landmarks[8]) > ptDist(wrist, landmarks[6]) * 1.15;
+      const midExt = ptDist(wrist, landmarks[12]) > ptDist(wrist, landmarks[10]) * 1.15;
+      const ringExt = ptDist(wrist, landmarks[16]) > ptDist(wrist, landmarks[14]) * 1.15;
+      const pinkyExt = ptDist(wrist, landmarks[20]) > ptDist(wrist, landmarks[18]) * 1.15;
 
       // Update HUD chips
       chipIndex.className = 'finger-chip' + (indexExt ? ' active' : '');
-      chipMiddle.className = 'finger-chip' + (middleExt ? ' active' : '');
+      chipMiddle.className = 'finger-chip' + (midExt ? ' active' : '');
       chipRing.className = 'finger-chip' + (ringExt ? ' active' : '');
       chipPinky.className = 'finger-chip' + (pinkyExt ? ' active' : '');
 
       chipIndex.textContent = indexExt ? 'Index UP' : 'Index DN';
-      chipMiddle.textContent = middleExt ? 'Mid UP' : 'Mid DN';
+      chipMiddle.textContent = midExt ? 'Mid UP' : 'Mid DN';
       chipRing.textContent = ringExt ? 'Ring UP' : 'Ring DN';
       chipPinky.textContent = pinkyExt ? 'Pinky UP' : 'Pinky DN';
 
-      // 1. OPEN PALM (Media Play / Pause): All 4 fingers extended
-      if (indexExt && middleExt && ringExt && pinkyExt) {
+      // 1. OPEN PALM (Play/Pause): All 4 fingers extended
+      if (indexExt && midExt && ringExt && pinkyExt) {
         return "PLAY_PAUSE";
       }
 
-      // 2. CLOSED FIST (Mute / Unmute): All 4 fingers folded
-      if (indexFold && middleFold && ringFold && pinkyFold) {
+      // 2. CLOSED FIST (Mute): All 4 fingers folded
+      if (!indexExt && !midExt && !ringExt && !pinkyExt) {
         return "MUTE";
       }
 
-      // 3. VOLUME: Only Index extended, others folded/curled
-      if (indexExt && !middleExt && !ringExt && !pinkyExt) {
-        return "VOLUME";
-      }
-
-      return "NONE";
+      // 3. VOLUME CONTROL: Any other position with thumb and index active
+      return "VOLUME";
     }
-
-    let canvasSized = false;
 
     function onResults(results) {
       const now = performance.now();
@@ -678,14 +624,8 @@
         lastTime = now;
       }
 
-      if (!canvasSized && videoElement.videoWidth) {
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        canvasSized = true;
-      }
-
-      const cw = canvasElement.width || 640;
-      const ch = canvasElement.height || 480;
+      const cw = canvasElement.width;
+      const ch = canvasElement.height;
 
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, cw, ch);
@@ -695,38 +635,19 @@
       let progress = 0;
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        handStatus.textContent = "Hand Tracked";
+        handStatus.textContent = "Hand Tracked ✓";
         handStatus.style.color = "#bbe045";
 
         const landmarks = results.multiHandLandmarks[0];
-        detectedGesture = recognizeGesture(landmarks);
+        detectedGesture = analyzeHand(landmarks);
 
-        // Draw hand skeleton
-        const connections = [
-          [0,1],[1,2],[2,3],[3,4],
-          [0,5],[5,6],[6,7],[7,8],
-          [5,9],[9,10],[10,11],[11,12],
-          [9,13],[13,14],[14,15],[15,16],
-          [13,17],[17,18],[18,19],[19,20],
-          [0,17]
-        ];
-
-        canvasCtx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-        canvasCtx.lineWidth = 3;
-        connections.forEach(([i, j]) => {
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(landmarks[i].x * cw, landmarks[i].y * ch);
-          canvasCtx.lineTo(landmarks[j].x * cw, landmarks[j].y * ch);
-          canvasCtx.stroke();
-        });
-
-        // Draw landmark points
-        landmarks.forEach((pt, idx) => {
-          canvasCtx.beginPath();
-          canvasCtx.arc(pt.x * cw, pt.y * ch, (idx === 4 || idx === 8) ? 9 : 5, 0, 2 * Math.PI);
-          canvasCtx.fillStyle = idx === 4 ? "#e140e0" : (idx === 8 ? "#ff9637" : "#bbe045");
-          canvasCtx.fill();
-        });
+        // Draw standard MediaPipe connectors & landmarks
+        if (typeof drawConnectors === 'function') {
+          drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#ffffff', lineWidth: 3 });
+        }
+        if (typeof drawLandmarks === 'function') {
+          drawLandmarks(canvasCtx, landmarks, { color: '#bbe045', lineWidth: 2, radius: 4 });
+        }
 
         const thumb = landmarks[4];
         const index = landmarks[8];
@@ -735,7 +656,7 @@
         const dist = Math.hypot(dx, dy);
         gapText.textContent = `${Math.round(dist)} px`;
 
-        // Connect Thumb and Index with prominent line
+        // Draw line between thumb and index with glowing end points
         canvasCtx.beginPath();
         canvasCtx.moveTo(thumb.x * cw, thumb.y * ch);
         canvasCtx.lineTo(index.x * cw, index.y * ch);
@@ -743,14 +664,25 @@
         canvasCtx.lineWidth = 4;
         canvasCtx.stroke();
 
-        // ---------------- VOLUME SLIDER ----------------
+        canvasCtx.beginPath();
+        canvasCtx.arc(thumb.x * cw, thumb.y * ch, 8, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = "#e140e0";
+        canvasCtx.fill();
+
+        canvasCtx.beginPath();
+        canvasCtx.arc(index.x * cw, index.y * ch, 8, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = "#46d2ff";
+        canvasCtx.fill();
+
+        // ---------------- VOLUME CONTROL ----------------
         if (controlEnabled && detectedGesture === "VOLUME") {
-          const minGap = 20;
-          const maxGap = 190;
+          // Linear mapping: pinch min ~ 25px -> 0%, max ~ 180px -> 100%
+          const minGap = 25;
+          const maxGap = 180;
           const target = Math.max(0, Math.min(100, ((dist - minGap) / (maxGap - minGap)) * 100));
-          smoothVolume = 0.80 * smoothVolume + 0.20 * target;
+          smoothVolume = 0.75 * smoothVolume + 0.25 * target;
           setVolume(smoothVolume);
-          actionMessage.textContent = `Adjusting Volume (${Math.round(smoothVolume)}%)`;
+          actionMessage.textContent = `Volume: ${Math.round(smoothVolume)}%`;
         }
 
         // ---------------- DISCRETE GESTURES (MUTE / PLAY_PAUSE) ----------------
@@ -765,6 +697,12 @@
 
           const held = (now - candidateSince) / 1000;
           progress = Math.min(held / GESTURE_HOLD_TIME, 1.0);
+
+          if (candidate === "MUTE") {
+            actionMessage.textContent = `Holding Fist: Muting in ${Math.max(0, (GESTURE_HOLD_TIME - held)).toFixed(1)}s`;
+          } else if (candidate === "PLAY_PAUSE") {
+            actionMessage.textContent = `Holding Palm: Play/Pause in ${Math.max(0, (GESTURE_HOLD_TIME - held)).toFixed(1)}s`;
+          }
 
           if (gestureArmed && held >= GESTURE_HOLD_TIME && (now - lastActionTime) / 1000 >= GESTURE_COOLDOWN) {
             if (candidate === "MUTE") {
@@ -782,9 +720,6 @@
           candidate = "NONE";
           progress = 0;
           gestureArmed = true;
-          if (controlEnabled && detectedGesture === "NONE") {
-            actionMessage.textContent = "Gestures Active";
-          }
         }
       } else {
         handStatus.textContent = "Searching...";
@@ -796,6 +731,9 @@
         chipMiddle.className = 'finger-chip';
         chipRing.className = 'finger-chip';
         chipPinky.className = 'finger-chip';
+        if (controlEnabled) {
+          actionMessage.textContent = "Hold hand in camera view";
+        }
       }
 
       gestureText.textContent = detectedGesture;
@@ -812,25 +750,31 @@
 
     hands.setOptions({
       maxNumHands: 1,
-      modelComplexity: 0, // Lite model is fast and responsive in all browsers
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
+      modelComplexity: 0,
+      minDetectionConfidence: 0.4,
+      minTrackingConfidence: 0.4
     });
 
     hands.onResults(onResults);
 
-    // Initialize Camera feed (640x480 standard resolution for fast WASM processing)
+    // Initialize Webcam
     const camera = new Camera(videoElement, {
       onFrame: async () => {
-        await hands.send({ image: videoElement });
+        try {
+          if (videoElement.readyState >= 2) {
+            await hands.send({ image: videoElement });
+          }
+        } catch (err) {
+          console.warn("Hands send error:", err);
+        }
       },
       width: 640,
       height: 480
     });
 
     camera.start().catch((err) => {
-      console.error("Camera error:", err);
-      actionMessage.textContent = "Camera permission denied or camera in use";
+      console.error("Camera access error:", err);
+      actionMessage.textContent = "Camera access denied. Please allow camera permissions.";
     });
 
     document.body.addEventListener('click', () => {
