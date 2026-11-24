@@ -409,9 +409,13 @@
         <h3>3. Open Palm (Play/Pause)</h3>
         <p>Show an <strong>open flat hand (5 straight fingers)</strong> and hold for 0.8s to toggle audio playback.</p>
       </div>
+      <div class="guide-card" style="border-color: #bbe045;">
+        <h3 style="color: #bbe045;">Connect Laptop Master Audio</h3>
+        <p>To control your laptop's actual Windows master volume (Spotify, YouTube, games), run <code>python bridge.py</code> on your PC. It links your webcam gestures directly to Windows system audio.</p>
+      </div>
       <div class="guide-card">
-        <h3>Windows Master Audio App</h3>
-        <p>To control your entire PC master audio (Spotify, games, system apps), run <code>python main.py</code> locally on Windows.</p>
+        <h3>Windows Desktop App (OpenCV)</h3>
+        <p>To run the standalone desktop version without browser, turn off Smart App Control in Windows Security and run <code>python main.py</code>.</p>
       </div>
     </div>
   </div>
@@ -454,6 +458,39 @@
     const GESTURE_HOLD_TIME = 0.8;
     const GESTURE_COOLDOWN = 1.0;
 
+    // Windows Laptop Audio Bridge Connection
+    let bridgeConnected = false;
+    let lastBridgeUpdate = 0;
+    const bridgeUrl = (window.location.origin.includes('127.0.0.1') || window.location.origin.includes('localhost')) 
+      ? '' 
+      : 'http://127.0.0.1:5005';
+
+    async function checkBridge() {
+      try {
+        const res = await fetch(`${bridgeUrl}/api/status`, { method: 'GET', signal: AbortSignal.timeout(1200) });
+        if (res.ok) {
+          const data = await res.json();
+          if (!bridgeConnected) {
+            bridgeConnected = true;
+            modeBadge.textContent = "LAPTOP AUDIO: CONNECTED 🟢";
+            modeBadge.style.color = "#bbe045";
+            actionMessage.textContent = `Connected to Windows: ${data.device || 'Master Volume'}`;
+            if (data.volume !== undefined) {
+              setVolume(data.volume, false);
+            }
+          }
+        }
+      } catch (e) {
+        if (bridgeConnected) {
+          bridgeConnected = false;
+          modeBadge.textContent = "MODE: ACTIVE (Browser Only)";
+          modeBadge.style.color = "#ffd246";
+        }
+      }
+    }
+    setInterval(checkBridge, 2000);
+    checkBridge();
+
     // Web Audio Synthesizer
     let audioCtx = null;
     let masterGain = null;
@@ -495,13 +532,20 @@
       }
     }
 
-    function setVolume(vol) {
+    function setVolume(vol, sendToBridge = true) {
       currentVolume = Math.max(0, Math.min(100, vol));
       if (!isMuted) {
         volumeText.textContent = `${Math.round(currentVolume)}%`;
         volumeFill.style.width = `${currentVolume}%`;
         if (masterGain && audioCtx) {
           masterGain.gain.setTargetAtTime((currentVolume / 100) * 0.18, audioCtx.currentTime, 0.04);
+        }
+      }
+      if (bridgeConnected && sendToBridge) {
+        const now = performance.now();
+        if (now - lastBridgeUpdate >= 60) {
+          fetch(`${bridgeUrl}/api/volume?level=${Math.round(currentVolume)}`).catch(() => {});
+          lastBridgeUpdate = now;
         }
       }
     }
@@ -519,11 +563,29 @@
         setVolume(currentVolume);
         actionMessage.textContent = "Audio Unmuted";
       }
+      if (bridgeConnected) {
+        fetch(`${bridgeUrl}/api/mute`).catch(() => {});
+      }
     }
 
     function togglePlayPause() {
+      if (bridgeConnected) {
+        fetch(`${bridgeUrl}/api/playpause`).catch(() => {});
+      }
       if (!audioCtx) {
         initAudio();
+        return;
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+        synthSoundBtn.textContent = "🔊 Audio Active (Playing)";
+        actionMessage.textContent = "Audio Resumed";
+      } else if (audioCtx.state === 'running') {
+        audioCtx.suspend();
+        synthSoundBtn.textContent = "🔇 Audio Paused (Click to Play)";
+        actionMessage.textContent = "Audio Paused";
+      }
+    }
         return;
       }
       if (audioCtx.state === 'suspended') {
